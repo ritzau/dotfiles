@@ -1,0 +1,13 @@
+# ~/.zshrc - sourced for INTERACTIVE shells only
+# Prompt, aliases, key bindings, completion, tools.
+
+ZDOTDIR_DOTFILES="${${(%):-%x}:A:h}"
+
+# Ensure login-shell setup has run (GUI terminals often skip zprofile)
+if [[ -z "$__DOTFILES_PROFILE_SOURCED" ]]; then
+  source "$ZDOTDIR_DOTFILES/zprofile"
+fi
+
+for f in "$ZDOTDIR_DOTFILES"/zshrc.d/<0-99>-*.zsh(N); do
+  source "$f"
+done

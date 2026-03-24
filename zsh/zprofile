@@ -1,0 +1,10 @@
+# ~/.zprofile - sourced for LOGIN shells only
+# One-time setup: ssh-agent, session vars, etc.
+
+ZDOTDIR_DOTFILES="${${(%):-%x}:A:h}"
+
+for f in "$ZDOTDIR_DOTFILES"/zprofile.d/<0-99>-*.zsh(N); do
+  source "$f"
+done
+
+export __DOTFILES_PROFILE_SOURCED=1

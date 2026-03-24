@@ -1,0 +1,25 @@
+[pull]
+	rebase = true
+[core]
+	autocrlf = input
+	pager = delta
+[interactive]
+	diffFilter = delta --color-only
+[delta]
+	navigate = true
+	side-by-side = true
+[merge]
+	conflictStyle = zdiff3
+[rebase]
+	updateRefs = true
+	autoStash = true
+[fetch]
+	prune = true
+[diff]
+	tool = kdiff3
+[init]
+	defaultBranch = main
+
+# Machine-local overrides (identity, signing, etc.)
+[include]
+	path = ~/.gitconfig.local
