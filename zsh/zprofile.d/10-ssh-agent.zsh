@@ -1,6 +1,7 @@
 SSH_AGENT_CFG="$HOME/.ssh/agent-cfg-$HOST.sh"
 
 start_ssh_agent() {
+  mkdir -p "${SSH_AGENT_CFG:h}"
   ssh-agent | sed '/^echo/d' > "$SSH_AGENT_CFG"
   chmod 600 "$SSH_AGENT_CFG"
   . "$SSH_AGENT_CFG"

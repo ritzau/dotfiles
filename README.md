@@ -29,9 +29,10 @@ exec zsh -l
 The install script will:
 
 1. Install Nix (if not already present)
-2. Install packages from `nix/packages.txt`
+2. Install packages from `flake.nix`
 3. Set up zsh config files (`~/.zshenv`, `~/.zprofile`, `~/.zshrc`)
 4. Symlink `git/config` to `~/.gitconfig`
+5. Symlink Neovim config to `~/.config/nvim/init.lua`
 
 Existing files are backed up with a `.bak` suffix before being replaced.
 

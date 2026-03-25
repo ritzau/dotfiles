@@ -3,18 +3,23 @@ set -euo pipefail
 
 DOTFILES_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+info()    { printf '\033[1;34m[info]\033[0m %s\n' "$*"; }
+warn()    { printf '\033[1;33m[warn]\033[0m %s\n' "$*" >&2; }
+error()   { printf '\033[1;31m[error]\033[0m %s\n' "$*" >&2; }
+fatal()   { printf '\033[1;31m[fatal]\033[0m %s\n' "$*" >&2; exit 1; }
+
 ensure_source_line() {
   local src="$1" dst="$2" local_file="$3"
   local source_line="source \"$src\""
   local local_line="[[ -f \"$local_file\" ]] && source \"$local_file\""
 
   if [[ -f "$dst" ]] && grep -qF "$source_line" "$dst"; then
-    echo "Already sourced in $dst"
+    info "Already sourced in $dst"
     return
   fi
 
   if [[ -f "$dst" ]]; then
-    echo "Backing up $dst -> ${dst}.bak"
+    warn "Backing up $dst -> ${dst}.bak"
     cp "$dst" "${dst}.bak"
   fi
 
@@ -24,7 +29,7 @@ $source_line
 # Machine-local overrides (not tracked in dotfiles)
 $local_line
 EOF
-  echo "Wrote $dst"
+  info "Wrote $dst"
 }
 
 link() {
@@ -32,54 +37,63 @@ link() {
   if [[ -L "$dst" ]]; then
     rm "$dst"
   elif [[ -e "$dst" ]]; then
-    echo "Backing up $dst -> ${dst}.bak"
+    warn "Backing up $dst -> ${dst}.bak"
     mv "$dst" "${dst}.bak"
   fi
-  ln -sv "$src" "$dst"
+  ln -s "$src" "$dst"
+  info "Linked $dst -> $src"
 }
 
 install_nix() {
   if command -v nix &>/dev/null; then
-    echo "Nix already installed"
+    info "Nix already installed"
     return
   fi
-  echo "Installing Nix..."
+  info "Installing Nix (single-user)..."
   local nix_installer
   nix_installer=$(mktemp)
-  curl -L -o "$nix_installer" https://nixos.org/nix/install
-  sh "$nix_installer" --daemon --yes
+  curl -fsSL -o "$nix_installer" https://nixos.org/nix/install
+  chmod +x "$nix_installer"
+  # Always use single-user mode to avoid sudo and system-level changes
+  sh "$nix_installer" --no-daemon 2>&1
   rm -f "$nix_installer"
   # Source nix in current shell so we can continue
-  . /etc/profile.d/nix.sh 2>/dev/null || true
+  local nix_sh
+  for nix_sh in \
+    /etc/profile.d/nix.sh \
+    /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh \
+    "$HOME/.nix-profile/etc/profile.d/nix.sh"; do
+    if [[ -f "$nix_sh" ]]; then
+      info "Sourcing $nix_sh"
+      . "$nix_sh"
+      break
+    fi
+  done
+  # Hard fallback: add nix to PATH directly
+  if ! command -v nix &>/dev/null; then
+    export PATH="$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH"
+  fi
+  if ! command -v nix &>/dev/null; then
+    fatal "nix not found in PATH after install"
+  fi
+
+  # Enable flakes if not already configured
+  local nix_conf_dir="$HOME/.config/nix"
+  local nix_conf="$nix_conf_dir/nix.conf"
+  if ! grep -qs 'experimental-features.*flakes' "$nix_conf" 2>/dev/null \
+     && ! grep -qs 'experimental-features.*flakes' /etc/nix/nix.conf 2>/dev/null; then
+    mkdir -p "$nix_conf_dir"
+    echo "experimental-features = nix-command flakes" >> "$nix_conf"
+    info "Enabled flakes in $nix_conf"
+  fi
 }
 
 install_packages() {
-  local packages_file="$DOTFILES_DIR/nix/packages.txt"
-  if [[ ! -f "$packages_file" ]]; then
-    echo "No packages.txt found, skipping"
-    return
-  fi
-
-  echo "Installing packages via nix profile..."
-
-  # Snapshot installed packages once (strip ANSI codes)
-  local installed
-  installed=$(nix profile list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | awk '/^Name:/{print $2}')
-
-  local pkg
-  while IFS= read -r pkg; do
-    [[ -z "$pkg" || "$pkg" == \#* ]] && continue
-    if echo "$installed" | grep -qx "$pkg"; then
-      echo "  $pkg (already installed)"
-    else
-      echo "  $pkg (installing)"
-      nix profile add "nixpkgs#$pkg"
-    fi
-  done < "$packages_file"
+  info "Installing packages from flake..."
+  nix profile install "$DOTFILES_DIR"
 }
 
-echo "Installing dotfiles from $DOTFILES_DIR"
-echo ""
+info "Installing dotfiles from $DOTFILES_DIR"
 
 # 1. Nix package manager
 install_nix
@@ -88,8 +102,7 @@ install_nix
 install_packages
 
 # 3. ZSH config (sourced, not symlinked)
-echo ""
-echo "Setting up shell config..."
+info "Setting up shell config..."
 ensure_source_line "$DOTFILES_DIR/zsh/zshenv"   "$HOME/.zshenv"   "$HOME/.zshenv.local"
 ensure_source_line "$DOTFILES_DIR/zsh/zprofile"  "$HOME/.zprofile" "$HOME/.zprofile.local"
 ensure_source_line "$DOTFILES_DIR/zsh/zshrc"     "$HOME/.zshrc"    "$HOME/.zshrc.local"
@@ -97,5 +110,9 @@ ensure_source_line "$DOTFILES_DIR/zsh/zshrc"     "$HOME/.zshrc"    "$HOME/.zshrc
 # 4. Git config (symlinked — gitconfig doesn't support sourcing)
 link "$DOTFILES_DIR/git/config" "$HOME/.gitconfig"
 
-echo ""
-echo "Done. Run: exec zsh -l"
+# 5. Neovim config
+info "Setting up Neovim config..."
+mkdir -p "$HOME/.config/nvim"
+link "$DOTFILES_DIR/nvim/init.lua" "$HOME/.config/nvim/init.lua"
+
+info "Done. Run: exec zsh -l"
