@@ -23,6 +23,26 @@ git-stack-list() {
   git for-each-ref --format='%(refname:short)' --merged=HEAD --no-merged=develop refs/heads/
 }
 
+git-stack-test() {
+  git rebase --exec "${*:-bazel test //...}" "$(git merge-base HEAD develop)"
+}
+
+git-merged-list() {
+  git branch --merged develop --format='%(refname:short)' | grep -v '^develop$'
+}
+
+git-merged-delete() {
+  local branches
+  branches=$(git-merged-list)
+  if [[ -z "$branches" ]]; then
+    echo "No merged branches to delete."
+    return 0
+  fi
+  echo "Deleting:"
+  echo "$branches"
+  echo "$branches" | xargs git branch -d
+}
+
 git-stack-push() {
   local branches
   branches=$(git-stack-list)
