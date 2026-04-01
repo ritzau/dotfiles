@@ -1,6 +1,9 @@
 # ~/.zshenv - sourced for ALL shells (login, interactive, scripts)
 # Keep this fast: only env vars and PATH setup.
 
+# Prevent /etc/zsh/zshrc from calling compinit (we do it in zshrc.d/20-completion.zsh)
+skip_global_compinit=1
+
 ZDOTDIR_DOTFILES="${${(%):-%x}:A:h}"
 
 for f in "$ZDOTDIR_DOTFILES"/zshenv.d/<0-99>-*.zsh(N); do
