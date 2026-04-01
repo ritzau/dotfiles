@@ -3,6 +3,7 @@
 [core]
 	autocrlf = input
 	pager = delta
+	commentChar = ";"
 [interactive]
 	diffFilter = delta --color-only
 [delta]
