@@ -16,10 +16,12 @@
             paths = with pkgs; [
               bat
               bottom
+              btop
               buildifier
               cloc
               delta
               direnv
+              dust
               eza
               fastfetch
               fd
@@ -33,12 +35,14 @@
               neovim
               neovim-gtk
               ripgrep
+              tldr
               tig
               traceroute
               tree
               uv
               xsel
               yq
+              zoxide
               zsh
               zsh-powerlevel10k
             ];
