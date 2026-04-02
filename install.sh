@@ -88,18 +88,44 @@ install_nix() {
   fi
 }
 
-install_packages() {
+install_nix_packages() {
   info "Installing packages from flake..."
-  nix profile install "$DOTFILES_DIR"
+  nix profile add "$DOTFILES_DIR"
+}
+
+
+install_brew() {
+  if ! command -v brew &>/dev/null; then
+      /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  fi
+
+  if [[ "$(uname -m)" == "arm64" ]]; then
+      eval "$(/opt/homebrew/bin/brew shellenv)"
+  else
+      eval "$(/usr/local/bin/brew shellenv)"
+  fi
+}
+
+install_brew_packages() {
+  info "Installing packages from flake..."
+  brew bundle --file=Brewfile
 }
 
 info "Installing dotfiles from $DOTFILES_DIR"
 
-# 1. Nix package manager
-install_nix
+if [[ "$(uname)" == "Darwin" ]]; then
+  # 1. Brew package manager
+  install_brew
 
-# 2. Packages
-install_packages
+  # 2. Packages
+  install_brew_packages
+else
+  # 1. Nix package manager
+  install_nix
+
+  # 2. Packages
+  install_nix_packages
+fi
 
 # 3. ZSH config (sourced, not symlinked)
 info "Setting up shell config..."

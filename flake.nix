@@ -34,6 +34,7 @@
               ncdu
               neovim
               neovim-gtk
+              parallel
               ripgrep
               tldr
               tig
