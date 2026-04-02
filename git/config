@@ -24,3 +24,6 @@
 # Machine-local overrides (identity, signing, etc.)
 [include]
 	path = ~/.gitconfig.local
+[user]
+	name = Tobias Ritzau
+	email = tobias@ritzau.se
