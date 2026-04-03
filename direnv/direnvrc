@@ -1,23 +1,30 @@
 # Shared direnv helpers — sourced by ~/.config/direnv/direnvrc
 
-# Check that the system depfile version meets the project's minimum requirement.
+# Check that the system depfile has been run recently enough.
 #
-# The depfile writes its version to a local marker on success:
+# The depfile stamps a marker on success:
 #   mkdir -p "$HOME/.local/share"
-#   echo 3 > "$HOME/.local/share/depfile-version"
+#   date +%s > "$HOME/.local/share/depfile-timestamp"
 #
-# The project .envrc declares the minimum version it needs:
-#   check_depfile_version 3 "https://... or /mnt/shared/depfile.sh"
+# The project .envrc declares the earliest acceptable run:
+#   check_depfile 2026-04-01 "https://... or /mnt/shared/depfile.sh"
 #
-check_depfile_version() {
-  local required="${1:?usage: check_depfile_version <min_version> [location]}"
+check_depfile() {
+  local min_date="${1:?usage: check_depfile <YYYY-MM-DD> [location]}"
   local location="${2:-}"
-  local version_file="$HOME/.local/share/depfile-version"
+  local timestamp_file="$HOME/.local/share/depfile-timestamp"
+
+  local required
+  required=$(date -d "$min_date" +%s 2>/dev/null || date -j -f "%Y-%m-%d" "$min_date" +%s 2>/dev/null)
   local installed
-  installed=$(cat "$version_file" 2>/dev/null || echo 0)
+  installed=$(cat "$timestamp_file" 2>/dev/null || echo 0)
 
   if (( installed < required )); then
-    local msg="depfile v${required} required (have v${installed})"
+    local last="never"
+    if (( installed > 0 )); then
+      last=$(date -d "@$installed" +%Y-%m-%d 2>/dev/null || date -r "$installed" +%Y-%m-%d 2>/dev/null)
+    fi
+    local msg="depfile outdated (last run: $last, need: >= $min_date)"
     if [[ -n "$location" ]]; then
       msg="$msg — run: $location"
     fi
