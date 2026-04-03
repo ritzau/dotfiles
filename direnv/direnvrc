@@ -2,24 +2,25 @@
 
 # Check that the system depfile version meets the project's minimum requirement.
 #
-# The depfile (a shared gist) writes its version to a local marker on success.
-# The project .envrc declares the minimum version it needs.
+# The depfile writes its version to a local marker on success:
+#   mkdir -p "$HOME/.local/share"
+#   echo 3 > "$HOME/.local/share/depfile-version"
 #
-# Usage in .envrc:
-#   check_depfile_version 3
-#
-# Usage in the depfile gist:
-#   DEPFILE_VERSION=3
-#   # ... install system deps ...
-#   echo "$DEPFILE_VERSION" > "$HOME/.local/share/depfile-version"
+# The project .envrc declares the minimum version it needs:
+#   check_depfile_version 3 "https://... or /mnt/shared/depfile.sh"
 #
 check_depfile_version() {
-  local required="${1:?usage: check_depfile_version <min_version>}"
+  local required="${1:?usage: check_depfile_version <min_version> [location]}"
+  local location="${2:-}"
   local version_file="$HOME/.local/share/depfile-version"
   local installed
   installed=$(cat "$version_file" 2>/dev/null || echo 0)
 
   if (( installed < required )); then
-    log_error "depfile v${required} required (have v${installed}) — update system deps"
+    local msg="depfile v${required} required (have v${installed})"
+    if [[ -n "$location" ]]; then
+      msg="$msg — run: $location"
+    fi
+    log_error "$msg"
   fi
 }
