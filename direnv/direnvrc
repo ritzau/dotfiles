@@ -3,8 +3,7 @@
 # Check that the system depfile has been run recently enough.
 #
 # The depfile stamps a marker on success:
-#   mkdir -p "$HOME/.local/share"
-#   date +%s > "$HOME/.local/share/depfile-timestamp"
+#   date +%s > "$HOME/.cache/depfile-timestamp"
 #
 # The project .envrc declares the earliest acceptable run:
 #   check_depfile 2026-04-01 "https://... or /mnt/shared/depfile.sh"
@@ -12,7 +11,7 @@
 check_depfile() {
   local min_date="${1:?usage: check_depfile <YYYY-MM-DD> [location]}"
   local location="${2:-}"
-  local timestamp_file="$HOME/.local/share/depfile-timestamp"
+  local timestamp_file="$HOME/.cache/depfile-timestamp"
 
   local required
   required=$(date -d "$min_date" +%s 2>/dev/null || date -j -f "%Y-%m-%d" "$min_date" +%s 2>/dev/null)
