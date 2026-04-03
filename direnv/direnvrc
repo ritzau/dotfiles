@@ -1,0 +1,19 @@
+# Shared direnv helpers — sourced by ~/.config/direnv/direnvrc
+
+# Check if a depfile needs to be re-run.
+#
+# Usage in .envrc:
+#   check_depfile depfile.sh depfile.lock
+#
+# Watches the depfile script for changes. If it is newer than the lock file
+# (or the lock file is missing), prints a warning to re-run it.
+check_depfile() {
+  local depfile="${1:?usage: check_depfile <script> [lockfile]}"
+  local lockfile="${2:-${depfile}.lock}"
+
+  watch_file "$depfile"
+
+  if [[ ! -f "$lockfile" ]] || [[ "$depfile" -nt "$lockfile" ]]; then
+    log_error "depfile out of date — run: ./$depfile"
+  fi
+}

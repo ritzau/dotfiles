@@ -26,6 +26,7 @@
               fastfetch
               fd
               fzf
+              gh
               git-absorb
               go
               gpustat

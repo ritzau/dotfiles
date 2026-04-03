@@ -90,7 +90,12 @@ install_nix() {
 
 install_nix_packages() {
   info "Installing packages from flake..."
-  nix profile add "$DOTFILES_DIR"
+  if nix profile list 2>/dev/null | grep -q dotfiles-packages; then
+    info "Upgrading existing dotfiles packages..."
+    nix profile upgrade '.*dotfiles-packages.*'
+  else
+    nix profile add "$DOTFILES_DIR"
+  fi
 }
 
 
@@ -140,5 +145,46 @@ link "$DOTFILES_DIR/git/config" "$HOME/.gitconfig"
 info "Setting up Neovim config..."
 mkdir -p "$HOME/.config/nvim"
 link "$DOTFILES_DIR/nvim/init.lua" "$HOME/.config/nvim/init.lua"
+
+# 6. direnv config
+info "Setting up direnv config..."
+mkdir -p "$HOME/.config/direnv"
+link "$DOTFILES_DIR/direnv/direnvrc" "$HOME/.config/direnv/direnvrc"
+
+# 7. Optional: GitHub CLI auth + SSH key setup
+setup_github() {
+  if ! command -v gh &>/dev/null; then
+    warn "gh not found, skipping GitHub setup"
+    return
+  fi
+
+  if gh auth status &>/dev/null; then
+    info "GitHub CLI already authenticated"
+  else
+    info "Authenticating with GitHub..."
+    gh auth login
+  fi
+
+  local key="$HOME/.ssh/id_ed25519"
+  if [[ -f "$key" ]]; then
+    info "SSH key already exists: $key"
+  else
+    info "Generating SSH key..."
+    ssh-keygen -t ed25519 -f "$key"
+  fi
+
+  if gh ssh-key list 2>/dev/null | grep -q "$(cat "${key}.pub" 2>/dev/null | awk '{print $2}')"; then
+    info "SSH key already registered with GitHub"
+  else
+    info "Adding SSH key to GitHub..."
+    gh ssh-key add "${key}.pub" --title "$(hostname) $(date +%Y-%m-%d)"
+  fi
+}
+
+printf '\n'
+read -rp "Set up GitHub CLI auth and SSH keys? [y/N] " ans
+if [[ "$ans" =~ ^[Yy]$ ]]; then
+  setup_github
+fi
 
 info "Done. Run: exec zsh -l"
