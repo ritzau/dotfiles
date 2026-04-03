@@ -1,19 +1,25 @@
 # Shared direnv helpers — sourced by ~/.config/direnv/direnvrc
 
-# Check if a depfile needs to be re-run.
+# Check that the system depfile version meets the project's minimum requirement.
+#
+# The depfile (a shared gist) writes its version to a local marker on success.
+# The project .envrc declares the minimum version it needs.
 #
 # Usage in .envrc:
-#   check_depfile depfile.sh depfile.lock
+#   check_depfile_version 3
 #
-# Watches the depfile script for changes. If it is newer than the lock file
-# (or the lock file is missing), prints a warning to re-run it.
-check_depfile() {
-  local depfile="${1:?usage: check_depfile <script> [lockfile]}"
-  local lockfile="${2:-${depfile}.lock}"
+# Usage in the depfile gist:
+#   DEPFILE_VERSION=3
+#   # ... install system deps ...
+#   echo "$DEPFILE_VERSION" > "$HOME/.local/share/depfile-version"
+#
+check_depfile_version() {
+  local required="${1:?usage: check_depfile_version <min_version>}"
+  local version_file="$HOME/.local/share/depfile-version"
+  local installed
+  installed=$(cat "$version_file" 2>/dev/null || echo 0)
 
-  watch_file "$depfile"
-
-  if [[ ! -f "$lockfile" ]] || [[ "$depfile" -nt "$lockfile" ]]; then
-    log_error "depfile out of date — run: ./$depfile"
+  if (( installed < required )); then
+    log_error "depfile v${required} required (have v${installed}) — update system deps"
   fi
 }
