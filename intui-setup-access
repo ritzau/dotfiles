@@ -18,6 +18,8 @@ fail() { printf '\033[31m  ✗ %s\033[0m\n' "$*"; }
 info() { printf '\033[34m  … %s\033[0m\n' "$*"; }
 head() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 
+has() { command -v "$1" &>/dev/null; }
+
 # --- Setup steps ---
 # Each step tries to fix its concern, then returns 0 (ok) or 1 (still broken).
 # Steps must handle being called when already set up (idempotent) and when
@@ -29,22 +31,22 @@ setup_tools() {
   for pair in curl:curl git:git ssh:openssh-client direnv:direnv; do
     local cmd="${pair%%:*}"
     local pkg="${pair##*:}"
-    if command -v "$cmd" &>/dev/null; then
+    if has "$cmd"; then
       continue
     fi
 
     info "Installing $cmd..."
-    if command -v apt-get &>/dev/null; then
+    if has apt-get; then
       sudo apt-get install -y "$pkg" >/dev/null 2>&1 || true
-    elif command -v brew &>/dev/null; then
+    elif has brew; then
       brew install "$pkg" >/dev/null 2>&1 || true
     fi
   done
 
   # gh needs special repo setup on apt
-  if ! command -v gh &>/dev/null; then
+  if ! has gh; then
     info "Installing gh..."
-    if command -v apt-get &>/dev/null; then
+    if has apt-get; then
       sudo mkdir -p /etc/apt/keyrings
       curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
         | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg >/dev/null 2>&1
@@ -52,7 +54,7 @@ setup_tools() {
         | sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null
       sudo apt-get update -qq >/dev/null 2>&1
       sudo apt-get install -y gh >/dev/null 2>&1 || true
-    elif command -v brew &>/dev/null; then
+    elif has brew; then
       brew install gh >/dev/null 2>&1 || true
     fi
   fi
@@ -61,7 +63,7 @@ setup_tools() {
 }
 
 setup_auth() {
-  if ! command -v gh &>/dev/null; then
+  if ! has gh; then
     return 1
   fi
 
@@ -94,7 +96,7 @@ setup_ssh_registered() {
     return 1
   fi
 
-  if ! command -v gh &>/dev/null || ! gh auth status &>/dev/null; then
+  if ! has gh || ! gh auth status &>/dev/null; then
     return 1
   fi
 
@@ -117,7 +119,7 @@ show_status() {
 
   head "Tools"
   for cmd in curl git ssh gh direnv; do
-    if command -v "$cmd" &>/dev/null; then
+    if has "$cmd"; then
       pass "$cmd"
     else
       fail "$cmd"
@@ -126,7 +128,7 @@ show_status() {
   done
 
   head "Authentication"
-  if ! command -v gh &>/dev/null; then
+  if ! has gh; then
     fail "gh not installed — cannot check"
     problems=$((problems + 1))
   elif gh auth status &>/dev/null; then
@@ -147,7 +149,7 @@ show_status() {
     problems=$((problems + 1))
   fi
 
-  if [[ -f "${key}.pub" ]] && command -v gh &>/dev/null && gh auth status &>/dev/null; then
+  if [[ -f "${key}.pub" ]] && has gh && gh auth status &>/dev/null; then
     local pub
     pub=$(awk '{print $2}' "${key}.pub")
     if gh ssh-key list 2>/dev/null | grep -q "$pub"; then
@@ -162,7 +164,7 @@ show_status() {
   fi
 
   head "Organization"
-  if command -v gh &>/dev/null && gh auth status &>/dev/null; then
+  if has gh && gh auth status &>/dev/null; then
     local login
     login=$(gh api user --jq .login 2>/dev/null || echo "")
     if [[ -n "$login" ]] && gh api "orgs/$INTUI_ORG/memberships/$login" &>/dev/null 2>&1; then
