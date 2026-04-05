@@ -1,18 +1,59 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# intui-setup-access — Set up local credentials for git host access.
+# intui-setup-access — Set up local credentials and verify git host access.
 #
 # Installs prerequisites, authenticates with the git host, generates an SSH
-# key, and registers it. Idempotent — safe to run multiple times.
+# key, registers it, and configures a standard git account name.
 #
-# After running this you can clone repos. Org/repo-level access is granted
-# separately by an admin.
+# Idempotent — safe to run multiple times. When everything is already set up
+# it acts as a doctor/status check.
+#
+# Account naming convention: intui-<first part of email before @>
 
-info()  { printf '\033[1;34m[info]\033[0m %s\n' "$*"; }
-warn()  { printf '\033[1;33m[warn]\033[0m %s\n' "$*" >&2; }
-ok()    { printf '\033[1;32m[ok]\033[0m %s\n' "$*"; }
-fatal() { printf '\033[1;31m[fatal]\033[0m %s\n' "$*" >&2; exit 1; }
+INTUI_ORG="${INTUI_ORG:-intui}"
+
+# --- Output helpers (plain fallbacks, gum when available) ---
+
+has_gum() { command -v gum &>/dev/null; }
+
+pass() {
+  if has_gum; then
+    gum style --foreground 2 "  ✓ $*"
+  else
+    printf '\033[1;32m  ✓\033[0m %s\n' "$*"
+  fi
+}
+
+fail() {
+  if has_gum; then
+    gum style --foreground 1 "  ✗ $*"
+  else
+    printf '\033[1;31m  ✗\033[0m %s\n' "$*"
+  fi
+}
+
+info() {
+  if has_gum; then
+    gum style --foreground 4 "  … $*"
+  else
+    printf '\033[1;34m  …\033[0m %s\n' "$*"
+  fi
+}
+
+fatal() {
+  fail "$@"
+  exit 1
+}
+
+header() {
+  printf '\n'
+  if has_gum; then
+    gum style --bold "$*"
+  else
+    printf '\033[1m%s\033[0m\n' "$*"
+  fi
+}
 
 # --- Prerequisites ---
 
@@ -20,26 +61,26 @@ ensure_command() {
   local cmd="$1"
   shift
   if command -v "$cmd" &>/dev/null; then
-    ok "$cmd already installed"
+    pass "$cmd"
     return
   fi
 
   info "Installing $cmd..."
   if command -v apt-get &>/dev/null; then
-    sudo apt-get install -y "$@"
+    sudo apt-get install -y "$@" >/dev/null 2>&1
   elif command -v brew &>/dev/null; then
-    brew install "$@"
+    brew install "$@" >/dev/null 2>&1
   else
     fatal "Cannot install $cmd — no supported package manager found (apt-get, brew)"
   fi
 
   command -v "$cmd" &>/dev/null || fatal "$cmd not found after install"
-  ok "$cmd installed"
+  pass "$cmd"
 }
 
 install_gh() {
   if command -v gh &>/dev/null; then
-    ok "gh already installed"
+    pass "gh"
     return
   fi
 
@@ -50,29 +91,56 @@ install_gh() {
       | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg >/dev/null
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
       | sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null
-    sudo apt-get update -qq
-    sudo apt-get install -y gh
+    sudo apt-get update -qq >/dev/null 2>&1
+    sudo apt-get install -y gh >/dev/null 2>&1
   elif command -v brew &>/dev/null; then
-    brew install gh
+    brew install gh >/dev/null 2>&1
   else
     fatal "Cannot install gh — no supported package manager found"
   fi
 
   command -v gh &>/dev/null || fatal "gh not found after install"
-  ok "gh installed"
+  pass "gh"
+}
+
+install_gum() {
+  if command -v gum &>/dev/null; then
+    pass "gum"
+    return
+  fi
+
+  info "Installing gum..."
+  if command -v apt-get &>/dev/null; then
+    sudo mkdir -p /etc/apt/keyrings
+    curl -fsSL https://repo.charm.sh/apt/gpg.key \
+      | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg 2>/dev/null
+    echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" \
+      | sudo tee /etc/apt/sources.list.d/charm.list >/dev/null
+    sudo apt-get update -qq >/dev/null 2>&1
+    sudo apt-get install -y gum >/dev/null 2>&1
+  elif command -v brew &>/dev/null; then
+    brew install gum >/dev/null 2>&1
+  else
+    info "Cannot install gum — continuing without it"
+    return
+  fi
+
+  command -v gum &>/dev/null && pass "gum"
 }
 
 # --- Authentication ---
 
 setup_gh_auth() {
   if gh auth status &>/dev/null; then
-    ok "gh already authenticated"
+    local user
+    user=$(gh api user --jq .login 2>/dev/null || echo "unknown")
+    pass "gh authenticated as $user"
     return
   fi
 
   info "Authenticating with GitHub..."
   gh auth login
-  ok "gh authenticated"
+  pass "gh authenticated"
 }
 
 # --- SSH key ---
@@ -81,42 +149,140 @@ setup_ssh_key() {
   local key="$HOME/.ssh/id_ed25519"
 
   if [[ -f "$key" ]]; then
-    ok "SSH key already exists: $key"
+    pass "SSH key exists: $key"
   else
     info "Generating SSH key..."
     mkdir -p "$HOME/.ssh"
     chmod 700 "$HOME/.ssh"
     ssh-keygen -t ed25519 -f "$key"
-    ok "SSH key generated: $key"
+    pass "SSH key generated"
   fi
 
   local pub
   pub=$(awk '{print $2}' "${key}.pub")
 
   if gh ssh-key list 2>/dev/null | grep -q "$pub"; then
-    ok "SSH key already registered with GitHub"
+    pass "SSH key registered with GitHub"
   else
     info "Adding SSH key to GitHub..."
     gh ssh-key add "${key}.pub" --title "$(hostname) $(date +%Y-%m-%d)"
-    ok "SSH key registered with GitHub"
+    pass "SSH key registered with GitHub"
   fi
+}
+
+# --- Git account name ---
+
+setup_git_account() {
+  local email
+  email=$(gh api user --jq .email 2>/dev/null || true)
+
+  if [[ -z "$email" || "$email" == "null" ]]; then
+    email=$(git config --global user.email 2>/dev/null || true)
+  fi
+
+  if [[ -z "$email" ]]; then
+    info "No email found — skipping account name setup"
+    return
+  fi
+
+  local local_part="${email%%@*}"
+  local expected="${INTUI_ORG}-${local_part}"
+  local current
+  current=$(whoami)
+
+  if [[ "$current" == "$expected" ]]; then
+    pass "Account name: $current"
+  else
+    info "Account name: $current (convention: $expected)"
+  fi
+}
+
+# --- Org access check ---
+
+check_org_access() {
+  local org="${1:-$INTUI_ORG}"
+
+  if gh api "orgs/$org/memberships/$(gh api user --jq .login 2>/dev/null)" &>/dev/null 2>&1; then
+    pass "Member of $org organization"
+  else
+    fail "Not a member of $org — ask an admin for access"
+  fi
+}
+
+# --- Status / Doctor ---
+
+show_status() {
+  header "Tools"
+  for cmd in curl git ssh gh gum direnv; do
+    if command -v "$cmd" &>/dev/null; then
+      pass "$cmd"
+    else
+      fail "$cmd"
+    fi
+  done
+
+  header "Authentication"
+  if gh auth status &>/dev/null; then
+    local user
+    user=$(gh api user --jq .login 2>/dev/null || echo "unknown")
+    pass "gh authenticated as $user"
+  else
+    fail "gh not authenticated"
+  fi
+
+  header "SSH"
+  local key="$HOME/.ssh/id_ed25519"
+  if [[ -f "$key" ]]; then
+    pass "SSH key exists: $key"
+    local pub
+    pub=$(awk '{print $2}' "${key}.pub")
+    if gh ssh-key list 2>/dev/null | grep -q "$pub"; then
+      pass "SSH key registered with GitHub"
+    else
+      fail "SSH key not registered with GitHub"
+    fi
+  else
+    fail "No SSH key at $key"
+  fi
+
+  header "Access"
+  check_org_access
+  setup_git_account
+
+  printf '\n'
 }
 
 # --- Main ---
 
-info "Setting up access..."
-printf '\n'
+case "${1:-setup}" in
+  status|doctor|check)
+    show_status
+    ;;
+  setup|"")
+    header "Prerequisites"
+    ensure_command curl curl
+    ensure_command git git
+    ensure_command ssh openssh-client
+    install_gum
+    install_gh
+    ensure_command direnv direnv
 
-ensure_command curl curl
-ensure_command git git
-ensure_command ssh openssh-client
-install_gh
-printf '\n'
+    header "Authentication"
+    setup_gh_auth
 
-setup_gh_auth
-printf '\n'
+    header "SSH"
+    setup_ssh_key
 
-setup_ssh_key
-printf '\n'
+    header "Access"
+    check_org_access
+    setup_git_account
 
-ok "Access setup complete. You can now clone repos."
+    printf '\n'
+    pass "Access setup complete. You can now clone repos."
+    printf '\n'
+    ;;
+  *)
+    echo "Usage: intui-setup-access [setup|status]"
+    exit 1
+    ;;
+esac
