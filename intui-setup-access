@@ -25,9 +25,9 @@ setup_tools() {
   install_pkg direnv
 
   # gh needs special repo setup on apt
-  if ! has gh; then
+  if ! has_command gh; then
     info "Installing gh..."
-    if has apt-get; then
+    if has_command apt-get; then
       sudo mkdir -p /etc/apt/keyrings
       curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
         | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg >/dev/null 2>&1
@@ -35,14 +35,14 @@ setup_tools() {
         | sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null
       sudo apt-get update -qq >/dev/null 2>&1
       sudo apt-get install -y gh >/dev/null 2>&1 || true
-    elif has brew; then
+    elif has_command brew; then
       brew install gh >/dev/null 2>&1 || true
     fi
   fi
 }
 
 setup_auth() {
-  if ! has gh; then
+  if ! has_command gh; then
     return 1
   fi
 
@@ -69,7 +69,7 @@ setup_ssh_registered() {
   local key="$HOME/.ssh/id_ed25519"
 
   [[ -f "${key}.pub" ]] || return 1
-  has gh && gh auth status &>/dev/null || return 1
+  has_command gh && gh auth status &>/dev/null || return 1
 
   local pub
   pub=$(awk '{print $2}' "${key}.pub")
@@ -87,7 +87,7 @@ show_status() {
 
   head "Tools"
   for cmd in curl git ssh gh direnv; do
-    if has "$cmd"; then
+    if has_command "$cmd"; then
       pass "$cmd"
     else
       fail "$cmd"
@@ -96,7 +96,7 @@ show_status() {
   done
 
   head "Authentication"
-  if ! has gh; then
+  if ! has_command gh; then
     fail "gh not installed — cannot check"
     problems=$((problems + 1))
   elif gh auth status &>/dev/null; then
@@ -117,7 +117,7 @@ show_status() {
     problems=$((problems + 1))
   fi
 
-  if [[ -f "${key}.pub" ]] && has gh && gh auth status &>/dev/null; then
+  if [[ -f "${key}.pub" ]] && has_command gh && gh auth status &>/dev/null; then
     local pub
     pub=$(awk '{print $2}' "${key}.pub")
     if gh ssh-key list 2>/dev/null | grep -q "$pub"; then
@@ -132,7 +132,7 @@ show_status() {
   fi
 
   head "Organization"
-  if has gh && gh auth status &>/dev/null; then
+  if has_command gh && gh auth status &>/dev/null; then
     local login
     login=$(gh api user --jq .login 2>/dev/null || echo "")
     if [[ -n "$login" ]] && gh api "orgs/$INTUI_ORG/memberships/$login" &>/dev/null 2>&1; then
