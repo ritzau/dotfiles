@@ -146,21 +146,27 @@ show_status() {
     problems=$((problems + 1))
   fi
 
-  head "Account"
-  local email
-  email=$(gh api user --jq .email 2>/dev/null || git config --global user.email 2>/dev/null || true)
-  if [[ -n "$email" && "$email" != "null" ]]; then
-    local local_part="${email%%@*}"
-    local expected="${INTUI_ORG}-${local_part}"
-    local current
-    current=$(whoami)
-    if [[ "$current" == "$expected" ]]; then
-      pass "Account name: $current"
+  head "GitHub account"
+  if has_command gh && gh auth status &>/dev/null; then
+    local login
+    login=$(gh api user --jq .login 2>/dev/null || echo "")
+    local email
+    email=$(gh api user --jq .email 2>/dev/null || true)
+
+    if [[ -n "$email" && "$email" != "null" ]]; then
+      local expected="${INTUI_ORG}-${email%%@*}"
+      if [[ "$login" == "$expected" ]]; then
+        pass "Username: $login"
+      else
+        fail "Username: $login (convention: $expected)"
+        problems=$((problems + 1))
+      fi
     else
-      info "Account name: $current (convention: $expected)"
+      info "Username: $login (no public email — cannot verify convention)"
     fi
   else
-    info "Account name: $(whoami) (cannot determine email for convention check)"
+    fail "GitHub account — cannot check (gh not authenticated)"
+    problems=$((problems + 1))
   fi
 
   printf '\n'
