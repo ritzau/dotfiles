@@ -19,16 +19,38 @@ alias gcan!='git commit --all --amend --no-edit'
 alias grasq='git rebase --interactive --autosquash origin/main'
 alias gcof='git checkout "$(git branch --format="%(refname:short)" | fzf)"'
 
-git-stack-list() {
-  git for-each-ref --format='%(refname:short)' --merged=HEAD --no-merged=develop refs/heads/
+# Base branch for the stack/merged helpers below: $GIT_BASE_BRANCH if set,
+# else origin's default branch (as recorded at clone time), else main.
+git-base-branch() {
+  if [[ -n $GIT_BASE_BRANCH ]]; then
+    print -r -- "$GIT_BASE_BRANCH"
+    return
+  fi
+  local head
+  head=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null) \
+    && print -r -- "${head#origin/}" \
+    || print -r -- main
 }
 
+git-stack-list() {
+  git for-each-ref --format='%(refname:short)' --merged=HEAD --no-merged="$(git-base-branch)" refs/heads/
+}
+
+# Run a command on every commit in the stack.  The command is the
+# arguments, or $GIT_STACK_TEST_CMD when none are given.
 git-stack-test() {
-  git rebase --exec "${*:-bazel test //...}" "$(git merge-base HEAD develop)"
+  local cmd="${*:-$GIT_STACK_TEST_CMD}"
+  if [[ -z $cmd ]]; then
+    echo "usage: git-stack-test <command>  (or set GIT_STACK_TEST_CMD)" >&2
+    return 2
+  fi
+  git rebase --exec "$cmd" "$(git merge-base HEAD "$(git-base-branch)")"
 }
 
 git-merged-list() {
-  git branch --merged develop --format='%(refname:short)' | grep -v '^develop$'
+  local base
+  base=$(git-base-branch)
+  git branch --merged "$base" --format='%(refname:short)' | grep -vx -- "$base"
 }
 
 git-merged-delete() {

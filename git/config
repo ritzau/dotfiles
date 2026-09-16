@@ -3,7 +3,6 @@
 [core]
 	autocrlf = input
 	pager = delta
-	commentChar = ";"
 [interactive]
 	diffFilter = delta --color-only
 [delta]
@@ -20,10 +19,17 @@
 	tool = kdiff3
 [init]
 	defaultBranch = main
-
-# Machine-local overrides (identity, signing, etc.)
-[include]
-	path = ~/.gitconfig.local
 [user]
 	name = Tobias Ritzau
 	email = tobias@ritzau.se
+[credential "https://github.com"]
+	helper = 
+	helper = !/usr/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+	helper = 
+	helper = !/usr/bin/gh auth git-credential
+
+# Machine-local overrides (identity, signing, etc.).  Must stay last:
+# later values win, so an include can only override what precedes it.
+[include]
+	path = ~/.gitconfig.local

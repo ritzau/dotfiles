@@ -40,6 +40,8 @@
               tig
               traceroute
               tree
+              tmux
+              tree-sitter
               uv
               xsel
               yq

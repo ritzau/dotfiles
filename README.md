@@ -7,7 +7,9 @@ Personal dotfiles managed with a simple install script. Uses [Nix](https://nixos
 ```
 git/          Git configuration (delta, zdiff3, rebase workflow)
 nix/          Nix package list and p10k theme for Nix environments
+nvim/         Neovim configuration (lazy.nvim, treesitter, fzf-lua)
 p10k/         Powerlevel10k prompt configuration
+tmux/         tmux configuration (mouse, truecolor)
 zsh/
   zshenv.d/   Environment variables and PATH (sourced for all shells)
   zprofile.d/ Login shell setup (ssh-agent, home-manager)
@@ -33,6 +35,7 @@ The install script will:
 3. Set up zsh config files (`~/.zshenv`, `~/.zprofile`, `~/.zshrc`)
 4. Symlink `git/config` to `~/.gitconfig`
 5. Symlink Neovim config to `~/.config/nvim/init.lua`
+6. Symlink `tmux/tmux.conf` to `~/.tmux.conf`
 
 Existing files are backed up with a `.bak` suffix before being replaced.
 
@@ -44,6 +47,14 @@ Machine-specific settings go in local files that are sourced automatically but n
 - `~/.zprofile.local`
 - `~/.zshrc.local`
 - `~/.gitconfig.local` (for user identity, signing keys, etc.)
+
+Work-specific defaults for the git helpers in `zsh/zshrc.d/41-git.zsh` also
+belong in `~/.zshrc.local`, e.g.
+
+```sh
+export GIT_STACK_TEST_CMD='bazel test //...'   # default for git-stack-test
+export GIT_BASE_BRANCH=develop                 # only if origin/HEAD is wrong
+```
 
 ## License
 

@@ -59,20 +59,34 @@ require("lazy").setup({
   { "tpope/vim-fugitive", cmd = "Git" },
   { "lewis6991/gitsigns.nvim", event = "BufReadPre", opts = {} },
 
-  -- Treesitter
+  -- Treesitter (main branch: no more nvim-treesitter.configs module;
+  -- parsers are installed via require("nvim-treesitter").install and
+  -- highlighting/indent are enabled per-buffer with core vim.treesitter).
+  -- Needs the `tree-sitter` CLI (in the flake) to compile parsers.
   {
     "nvim-treesitter/nvim-treesitter",
+    branch = "main",
+    lazy = false,
     build = ":TSUpdate",
-    event = "BufReadPost",
-    opts = {
-      ensure_installed = {
-        "bash", "c", "go", "json", "lua", "markdown", "python", "rust", "yaml",
-      },
-      highlight = { enable = true },
-      indent = { enable = true },
-    },
-    config = function(_, opts)
-      require("nvim-treesitter.configs").setup(opts)
+    config = function()
+      local ts = require("nvim-treesitter")
+      local languages = {
+        "bash", "c", "go", "json", "lua", "markdown", "markdown_inline",
+        "python", "rust", "yaml",
+      }
+      if vim.fn.executable("tree-sitter") == 1 then
+        ts.install(languages)
+      else
+        vim.notify("nvim-treesitter: `tree-sitter` CLI not found; skipping parser install", vim.log.levels.WARN)
+      end
+      vim.api.nvim_create_autocmd("FileType", {
+        callback = function(args)
+          if not pcall(vim.treesitter.start, args.buf) then
+            return
+          end
+          vim.bo[args.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+        end,
+      })
     end,
   },
 

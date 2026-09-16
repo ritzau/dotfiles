@@ -89,8 +89,21 @@ install_nix() {
 }
 
 install_nix_packages() {
-  info "Installing packages from flake..."
-  nix profile add "$DOTFILES_DIR"
+  # Find an existing profile entry that points at this flake, if any.
+  local existing
+  existing=$(NO_COLOR=1 nix profile list 2>/dev/null \
+    | awk -v dir="$DOTFILES_DIR" '
+        { gsub(/\033\[[0-9;]*m/, "") }
+        /^Name:/                       { name=$2 }
+        /flake URL:/ && index($0, dir) { print name; exit }')
+
+  if [[ -n "$existing" ]]; then
+    info "Upgrading packages from flake..."
+    nix profile upgrade "$existing"
+  else
+    info "Installing packages from flake..."
+    nix profile add "$DOTFILES_DIR"
+  fi
 }
 
 
@@ -140,5 +153,9 @@ link "$DOTFILES_DIR/git/config" "$HOME/.gitconfig"
 info "Setting up Neovim config..."
 mkdir -p "$HOME/.config/nvim"
 link "$DOTFILES_DIR/nvim/init.lua" "$HOME/.config/nvim/init.lua"
+
+# 6. tmux config
+info "Setting up tmux config..."
+link "$DOTFILES_DIR/tmux/tmux.conf" "$HOME/.tmux.conf"
 
 info "Done. Run: exec zsh -l"
