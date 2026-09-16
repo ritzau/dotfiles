@@ -26,10 +26,18 @@ git-base-branch() {
     print -r -- "$GIT_BASE_BRANCH"
     return
   fi
-  local head
-  head=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null) \
-    && print -r -- "${head#origin/}" \
-    || print -r -- main
+  local head b
+  if head=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null); then
+    print -r -- "${head#origin/}"
+    return
+  fi
+  for b in main master develop; do
+    if git show-ref --verify --quiet "refs/heads/$b"; then
+      print -r -- "$b"
+      return
+    fi
+  done
+  print -r -- main
 }
 
 git-stack-list() {
@@ -81,7 +89,16 @@ git-merged-list() {
   git branch --merged "$base" --format='%(refname:short)' | grep -vx -- "$base"
 }
 
+# Delete branches merged into the base branch.  -f/--force/-D uses
+# `git branch -D` for branches git considers not fully merged (e.g. the
+# base moved on after a squash or rebase).
 git-merged-delete() {
+  local flag=-d
+  case ${1:-} in
+    -f|--force|-D) flag=-D ;;
+    "") ;;
+    *) echo "usage: git-merged-delete [-f|--force]" >&2; return 2 ;;
+  esac
   local branches
   branches=$(git-merged-list)
   if [[ -z "$branches" ]]; then
@@ -90,7 +107,7 @@ git-merged-delete() {
   fi
   echo "Deleting:"
   echo "$branches"
-  echo "$branches" | xargs git branch -d
+  echo "$branches" | xargs git branch "$flag"
 }
 
 git-stack-push() {
