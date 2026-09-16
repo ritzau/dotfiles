@@ -48,12 +48,14 @@ Machine-specific settings go in local files that are sourced automatically but n
 - `~/.zshrc.local`
 - `~/.gitconfig.local` (for user identity, signing keys, etc.)
 
-Work-specific defaults for the git helpers in `zsh/zshrc.d/41-git.zsh` also
-belong in `~/.zshrc.local`, e.g.
+The git helpers in `zsh/zshrc.d/41-git.zsh` infer their defaults from the
+repo: the base branch from `origin/HEAD`, and the test command for
+`git-stack-test` from the build system at the root (bazel, just, cargo, go,
+npm, pytest). Override in `~/.zshrc.local` only when the inference is wrong:
 
 ```sh
-export GIT_STACK_TEST_CMD='bazel test //...'   # default for git-stack-test
-export GIT_BASE_BRANCH=develop                 # only if origin/HEAD is wrong
+export GIT_STACK_TEST_CMD='bazel test //foo/...'
+export GIT_BASE_BRANCH=develop
 ```
 
 ## License

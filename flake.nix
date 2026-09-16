@@ -31,6 +31,7 @@
               gpustat
               htop
               just
+              less
               ncdu
               neovim
               neovim-gtk

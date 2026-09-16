@@ -55,12 +55,26 @@ autoload -U down-line-or-beginning-search
 zle -N up-line-or-beginning-search
 zle -N down-line-or-beginning-search
 
+# Key codes: terminfo by default (portable — works in containers, over
+# ssh, in tmux), with a machine-local ~/.zkbd file (autoload zkbd && zkbd)
+# as an override for terminals whose terminfo is wrong or missing.
+zmodload zsh/terminfo
+typeset -gA key
+key=(
+  Up     "${terminfo[kcuu1]}"  Down   "${terminfo[kcud1]}"
+  Home   "${terminfo[khome]}"  End    "${terminfo[kend]}"
+  Delete "${terminfo[kdch1]}"  Insert "${terminfo[kich1]}"
+)
 KEYBIND_DEFS=~/.zkbd/$TERM-${${DISPLAY:t}:-$VENDOR-$OSTYPE}
-if [[ -f "$KEYBIND_DEFS" ]]; then
-  source "$KEYBIND_DEFS"
-elif [[ -z "$__ZKBD_WARNING_SHOWN" ]]; then
-  echo "zkbd: no key definitions for $TERM. Run: autoload zkbd && zkbd"
-  export __ZKBD_WARNING_SHOWN=1
+[[ -f "$KEYBIND_DEFS" ]] && source "$KEYBIND_DEFS"
+# terminfo's key codes are the ones sent in keypad-transmit mode; make sure
+# the terminal is in that mode while zle is reading a line.
+if (( ${+terminfo[smkx]} && ${+terminfo[rmkx]} )); then
+  autoload -Uz add-zle-hook-widget
+  zle-keypad-on()  { echoti smkx }
+  zle-keypad-off() { echoti rmkx }
+  add-zle-hook-widget zle-line-init   zle-keypad-on
+  add-zle-hook-widget zle-line-finish zle-keypad-off
 fi
 [[ -n ${key[Up]} ]]     && bindkey "${key[Up]}"     up-line-or-beginning-search
 [[ -n ${key[Down]} ]]   && bindkey "${key[Down]}"   down-line-or-beginning-search

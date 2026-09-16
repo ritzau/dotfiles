@@ -36,14 +36,42 @@ git-stack-list() {
   git for-each-ref --format='%(refname:short)' --merged=HEAD --no-merged="$(git-base-branch)" refs/heads/
 }
 
-# Run a command on every commit in the stack.  The command is the
-# arguments, or $GIT_STACK_TEST_CMD when none are given.
+# Default test command for the current repo: $GIT_STACK_TEST_CMD if set,
+# else inferred from the build system found at the repo root.  Prints
+# nothing (and fails) when it can't tell.
+git-test-cmd() {
+  if [[ -n $GIT_STACK_TEST_CMD ]]; then
+    print -r -- "$GIT_STACK_TEST_CMD"
+    return
+  fi
+  local root
+  root=$(git rev-parse --show-toplevel 2>/dev/null) || return 1
+  if [[ -f $root/MODULE.bazel || -f $root/WORKSPACE || -f $root/WORKSPACE.bazel ]]; then
+    print -r -- "bazel test //..."
+  elif [[ -f $root/justfile || -f $root/Justfile ]] && just --list 2>/dev/null | grep -qE '^\s+test\b'; then
+    print -r -- "just test"
+  elif [[ -f $root/Cargo.toml ]]; then
+    print -r -- "cargo test"
+  elif [[ -f $root/go.mod ]]; then
+    print -r -- "go test ./..."
+  elif [[ -f $root/package.json ]] && grep -q '"test"' "$root/package.json"; then
+    print -r -- "npm test"
+  elif [[ -f $root/pyproject.toml || -f $root/pytest.ini ]]; then
+    print -r -- "pytest"
+  else
+    return 1
+  fi
+}
+
+# Run a command on every commit in the stack: the arguments, or
+# git-test-cmd's default when none are given.
 git-stack-test() {
-  local cmd="${*:-$GIT_STACK_TEST_CMD}"
+  local cmd="${*:-$(git-test-cmd)}"
   if [[ -z $cmd ]]; then
-    echo "usage: git-stack-test <command>  (or set GIT_STACK_TEST_CMD)" >&2
+    echo "usage: git-stack-test <command>  (no default test command detected for this repo; set GIT_STACK_TEST_CMD)" >&2
     return 2
   fi
+  echo "→ $cmd on each commit since $(git-base-branch)" >&2
   git rebase --exec "$cmd" "$(git merge-base HEAD "$(git-base-branch)")"
 }
 
