@@ -113,6 +113,13 @@ require("lazy").setup({
     },
     opts = {
       auto_reload = true,
+      lang = {
+        cpp = {
+          coverage_file = function()
+            return vim.fs.root(0, ".git") .. "/.cache/coverage/lcov.info"
+          end,
+        },
+      },
     },
   },
 
