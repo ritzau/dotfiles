@@ -76,12 +76,23 @@ if (( ${+terminfo[smkx]} && ${+terminfo[rmkx]} )); then
   add-zle-hook-widget zle-line-init   zle-keypad-on
   add-zle-hook-widget zle-line-finish zle-keypad-off
 fi
-[[ -n ${key[Up]} ]]     && bindkey "${key[Up]}"     up-line-or-beginning-search
-[[ -n ${key[Down]} ]]   && bindkey "${key[Down]}"   down-line-or-beginning-search
-[[ -n ${key[Home]} ]]   && bindkey "${key[Home]}"   beginning-of-line
-[[ -n ${key[End]} ]]    && bindkey "${key[End]}"     end-of-line
-[[ -n ${key[Delete]} ]] && bindkey "${key[Delete]}" delete-char
-[[ -n ${key[Insert]} ]] && bindkey "${key[Insert]}" overwrite-mode
+
+# Bind every code a key can send, not just one: terminfo gives the
+# keypad-transmit form (Up = ^[OA), a zkbd file recorded outside that mode
+# gives the normal one (^[[A), and either can arrive depending on terminal.
+bind-key-codes() {
+  local widget=$1 code
+  for code in "${@:2}"; do
+    [[ -n $code ]] && bindkey -- "$code" "$widget"
+  done
+}
+bind-key-codes up-line-or-beginning-search   "${key[Up]}"     "${terminfo[kcuu1]}" $'\e[A'
+bind-key-codes down-line-or-beginning-search "${key[Down]}"   "${terminfo[kcud1]}" $'\e[B'
+bind-key-codes beginning-of-line             "${key[Home]}"   "${terminfo[khome]}" $'\e[H' $'\eOH' $'\e[1~'
+bind-key-codes end-of-line                   "${key[End]}"    "${terminfo[kend]}"  $'\e[F' $'\eOF' $'\e[4~'
+bind-key-codes delete-char                   "${key[Delete]}" "${terminfo[kdch1]}" $'\e[3~'
+bind-key-codes overwrite-mode                "${key[Insert]}" "${terminfo[kich1]}" $'\e[2~'
+unfunction bind-key-codes
 
 # Empty enter runs git status or ls
 empty-line-status() {
