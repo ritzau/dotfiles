@@ -133,6 +133,19 @@ if [[ "$(uname)" == "Darwin" ]]; then
   # 2. Packages
   install_brew_packages
 else
+  # In an intui-claude container $HOME is ephemeral; /nix and nix's
+  # per-user state are PERSIST volumes.  Re-link the profile so nix is
+  # found again, and keep the installer from touching channels/profile.
+  if [[ -n "${INTUI_CONTAINER:-}" ]]; then
+    export NIX_INSTALLER_NO_CHANNEL_ADD=1 NIX_INSTALLER_NO_MODIFY_PROFILE=1
+    if [[ -e "$HOME/.local/state/nix/profiles/profile" && ! -e "$HOME/.nix-profile" ]]; then
+      ln -s "$HOME/.local/state/nix/profiles/profile" "$HOME/.nix-profile"
+    fi
+    [[ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]] && . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+    # The container shell sources ~/.profile after this script.
+    echo '[ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ] && . "$HOME/.nix-profile/etc/profile.d/nix.sh"' > "$HOME/.profile"
+  fi
+
   # 1. Nix package manager
   install_nix
 
