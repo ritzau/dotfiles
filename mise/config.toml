@@ -1,0 +1,27 @@
+# Tools installed per user from each project's own releases, no root:
+# `mise install` (install.sh runs it).  Linked to ~/.config/mise/config.toml.
+# System packages (zsh, tmux, htop, tig, ncdu, parallel) are the machine's
+# business; install.sh lists the missing ones.
+[tools]
+bat = "latest"
+bottom = "latest"
+btop = "latest"
+buildifier = "latest"
+cloc = "latest"
+delta = "latest"
+direnv = "latest"
+dust = "latest"
+eza = "latest"
+fastfetch = "latest"
+fd = "latest"
+fzf = "latest"
+"ubi:tummychow/git-absorb" = "latest"
+go = "latest"
+just = "latest"
+neovim = "latest"
+ripgrep = "latest"
+tealdeer = "latest"
+tree-sitter = "latest"
+uv = "latest"
+yq = "latest"
+zoxide = "latest"

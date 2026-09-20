@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
+# Set this machine up for me, as me — no sudo.  Tools come from mise
+# (mise/config.toml, each project's own release binaries); configs are
+# sourced or linked from this directory.  Re-runnable: a second run updates.
 set -euo pipefail
 
 DOTFILES_DIR="$(cd "$(dirname "$0")" && pwd)"
+BIN="$HOME/.local/bin"
+export PATH="$BIN:$HOME/.local/share/mise/shims:$PATH"
 
 info()    { printf '\033[1;34m[info]\033[0m %s\n' "$*"; }
 warn()    { printf '\033[1;33m[warn]\033[0m %s\n' "$*" >&2; }
-error()   { printf '\033[1;31m[error]\033[0m %s\n' "$*" >&2; }
-fatal()   { printf '\033[1;31m[fatal]\033[0m %s\n' "$*" >&2; exit 1; }
 
 ensure_source_line() {
   local src="$1" dst="$2" local_file="$3"
@@ -40,122 +43,86 @@ link() {
     warn "Backing up $dst -> ${dst}.bak"
     mv "$dst" "${dst}.bak"
   fi
+  mkdir -p "$(dirname "$dst")"
   ln -s "$src" "$dst"
   info "Linked $dst -> $src"
 }
 
-install_nix() {
-  if command -v nix &>/dev/null; then
-    info "Nix already installed"
+# mise itself: one static binary from its GitHub release (mise.run does the
+# same, from a host a network filter may not know).
+install_mise() {
+  if command -v mise >/dev/null 2>&1; then
+    info "mise $(mise --version)"
     return
   fi
-  info "Installing Nix (single-user)..."
-  local nix_installer
-  nix_installer=$(mktemp)
-  curl -fsSL -o "$nix_installer" https://nixos.org/nix/install
-  chmod +x "$nix_installer"
-  # Always use single-user mode to avoid sudo and system-level changes
-  sh "$nix_installer" --no-daemon 2>&1
-  rm -f "$nix_installer"
-  # Source nix in current shell so we can continue
-  local nix_sh
-  for nix_sh in \
-    /etc/profile.d/nix.sh \
-    /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh \
-    "$HOME/.nix-profile/etc/profile.d/nix.sh"; do
-    if [[ -f "$nix_sh" ]]; then
-      info "Sourcing $nix_sh"
-      . "$nix_sh"
-      break
-    fi
+  local os arch tag
+  case "$(uname -s)" in Darwin) os=macos ;; *) os=linux ;; esac
+  case "$(uname -m)" in arm64|aarch64) arch=arm64 ;; *) arch=x64 ;; esac
+  # Assets carry the version; /releases/latest redirects to its tag.
+  tag=$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/jdx/mise/releases/latest)
+  tag=${tag##*/}
+  info "Installing mise $tag into $BIN..."
+  mkdir -p "$BIN"
+  curl -fsSL -o "$BIN/mise" "https://github.com/jdx/mise/releases/download/$tag/mise-$tag-$os-$arch"
+  chmod +x "$BIN/mise"
+}
+
+install_tools() {
+  link "$DOTFILES_DIR/mise/config.toml" "$HOME/.config/mise/config.toml"
+  info "Installing tools (mise/config.toml)..."
+  MISE_YES=1 mise install
+  # gpustat is a Python package; only where there is a GPU to look at.
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    uv tool install -q gpustat
+  fi
+}
+
+# Pure zsh, so a clone is the install — the same on every machine.
+install_p10k() {
+  local dir="$HOME/.local/share/powerlevel10k"
+  if [[ -d "$dir/.git" ]]; then
+    git -C "$dir" pull -q --ff-only || warn "powerlevel10k: could not update (offline?)"
+  else
+    info "Cloning powerlevel10k..."
+    git clone -q --depth 1 https://github.com/romkatv/powerlevel10k.git "$dir"
+  fi
+}
+
+# The machine's to install, not mine: the shell, tmux and curses tools
+# without static builds.  Listed, never sudo'd.
+check_system_tools() {
+  local missing=() tool
+  for tool in zsh tmux htop tig ncdu parallel; do
+    command -v "$tool" >/dev/null 2>&1 || missing+=("$tool")
   done
-  # Hard fallback: add nix to PATH directly
-  if ! command -v nix &>/dev/null; then
-    export PATH="$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH"
+  if (( ${#missing[@]} )); then
+    warn "System tools missing: ${missing[*]}"
+    warn "  Debian/Ubuntu: sudo apt install ${missing[*]}"
+    warn "  macOS:         brew bundle --file=$DOTFILES_DIR/Brewfile"
   fi
-  if ! command -v nix &>/dev/null; then
-    fatal "nix not found in PATH after install"
-  fi
-
-  # Enable flakes if not already configured
-  local nix_conf_dir="$HOME/.config/nix"
-  local nix_conf="$nix_conf_dir/nix.conf"
-  if ! grep -qs 'experimental-features.*flakes' "$nix_conf" 2>/dev/null \
-     && ! grep -qs 'experimental-features.*flakes' /etc/nix/nix.conf 2>/dev/null; then
-    mkdir -p "$nix_conf_dir"
-    echo "experimental-features = nix-command flakes" >> "$nix_conf"
-    info "Enabled flakes in $nix_conf"
-  fi
-}
-
-install_nix_packages() {
-  # Find an existing profile entry that points at this flake, if any.
-  local existing
-  existing=$(NO_COLOR=1 nix profile list 2>/dev/null \
-    | awk -v dir="$DOTFILES_DIR" '
-        { gsub(/\033\[[0-9;]*m/, "") }
-        /^Name:/                       { name=$2 }
-        /flake URL:/ && index($0, dir) { print name; exit }')
-
-  if [[ -n "$existing" ]]; then
-    info "Upgrading packages from flake..."
-    nix profile upgrade "$existing"
-  else
-    info "Installing packages from flake..."
-    nix profile add "$DOTFILES_DIR"
-  fi
-}
-
-
-install_brew() {
-  if ! command -v brew &>/dev/null; then
-      /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-  fi
-
-  if [[ "$(uname -m)" == "arm64" ]]; then
-      eval "$(/opt/homebrew/bin/brew shellenv)"
-  else
-      eval "$(/usr/local/bin/brew shellenv)"
-  fi
-}
-
-install_brew_packages() {
-  info "Installing packages from flake..."
-  brew bundle --file=Brewfile
 }
 
 info "Installing dotfiles from $DOTFILES_DIR"
 
-if [[ "$(uname)" == "Darwin" ]]; then
-  # 1. Brew package manager
-  install_brew
+# 1. Tools, as me
+install_mise
+install_tools
+install_p10k
+check_system_tools
 
-  # 2. Packages
-  install_brew_packages
-else
-  # 1. Nix package manager
-  install_nix
-
-  # 2. Packages
-  install_nix_packages
-fi
-
-# 3. ZSH config (sourced, not symlinked)
+# 2. ZSH config (sourced, not symlinked)
 info "Setting up shell config..."
 ensure_source_line "$DOTFILES_DIR/zsh/zshenv"   "$HOME/.zshenv"   "$HOME/.zshenv.local"
 ensure_source_line "$DOTFILES_DIR/zsh/zprofile"  "$HOME/.zprofile" "$HOME/.zprofile.local"
 ensure_source_line "$DOTFILES_DIR/zsh/zshrc"     "$HOME/.zshrc"    "$HOME/.zshrc.local"
 
-# 4. Git config (symlinked — gitconfig doesn't support sourcing)
+# 3. Git config (symlinked — gitconfig doesn't support sourcing)
 link "$DOTFILES_DIR/git/config" "$HOME/.gitconfig"
 
-# 5. Neovim config
-info "Setting up Neovim config..."
-mkdir -p "$HOME/.config/nvim"
+# 4. Neovim config
 link "$DOTFILES_DIR/nvim/init.lua" "$HOME/.config/nvim/init.lua"
 
-# 6. tmux config
-info "Setting up tmux config..."
+# 5. tmux config
 link "$DOTFILES_DIR/tmux/tmux.conf" "$HOME/.tmux.conf"
 
 info "Done. Run: exec zsh -l"
