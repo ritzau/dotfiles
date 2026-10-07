@@ -73,6 +73,11 @@ vim.api.nvim_create_autocmd("LspProgress", {
 ------------------------------------------------------------------------
 -- Plugins
 ------------------------------------------------------------------------
+-- init.lua is symlinked in from the dotfiles repo; resolve it so lazy writes
+-- its lockfile next to this file instead of into ~/.config/nvim (untracked).
+local init_path = vim.uv.fs_realpath(vim.fn.stdpath("config") .. "/init.lua")
+local lockfile = init_path and (vim.fs.dirname(init_path) .. "/lazy-lock.json") or nil
+
 require("lazy").setup({
   -- Quick navigation (replaces easymotion)
   {
@@ -255,6 +260,8 @@ require("lazy").setup({
       vim.cmd.colorscheme("tokyonight")
     end,
   },
+}, {
+  lockfile = lockfile,
 })
 
 ------------------------------------------------------------------------
