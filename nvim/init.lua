@@ -13,14 +13,19 @@ vim.opt.rtp:prepend(lazypath)
 vim.g.mapleader = " "
 vim.g.maplocalleader = " "
 
+-- Common cleanup appended to every formatter chain
+local function fmt(...)
+  return { ..., "trim_whitespace", "trim_newlines" }
+end
+
 ------------------------------------------------------------------------
 -- Options
 ------------------------------------------------------------------------
 vim.opt.number = true
 vim.opt.relativenumber = true
 
-vim.opt.tabstop = 4
-vim.opt.shiftwidth = 4
+vim.opt.tabstop = 2
+vim.opt.shiftwidth = 2
 vim.opt.expandtab = true
 vim.opt.smartindent = true
 
@@ -34,12 +39,36 @@ vim.opt.termguicolors = true
 vim.opt.signcolumn = "yes"
 vim.opt.cursorline = true
 vim.opt.scrolloff = 8
+vim.opt.wildmode = "longest:full,full"
 
 vim.opt.undofile = true
 vim.opt.swapfile = false
 
 vim.opt.updatetime = 250
 vim.opt.clipboard = "unnamedplus"
+
+vim.opt.completeopt = { "menu", "menuone", "noinsert", "fuzzy", "popup" }
+
+vim.api.nvim_create_autocmd("LspAttach", {
+  callback = function(ev)
+    vim.lsp.completion.enable(true, ev.data.client_id, ev.buf, { autotrigger = true })
+    -- manual trigger
+    vim.keymap.set("i", "<C-space>", vim.lsp.completion.get, { buffer = ev.buf })
+  end,
+})
+
+vim.diagnostic.config({
+  virtual_text = true,            -- message at end of line
+  -- or:
+  -- virtual_lines = { current_line = true },  -- full text under the current line
+  severity_sort = true,
+})
+
+vim.opt.statusline = " %f %m%r %= %{v:lua.vim.lsp.status()} %l:%c "
+
+vim.api.nvim_create_autocmd("LspProgress", {
+  callback = function() vim.cmd.redrawstatus() end,
+})
 
 ------------------------------------------------------------------------
 -- Plugins
@@ -55,9 +84,61 @@ require("lazy").setup({
     },
   },
 
+  -- File browser
+  {
+    "stevearc/oil.nvim",
+    lazy = false,
+    opts = {
+      delete_to_trash = true,
+    },
+    keys = {
+      { "-", "<cmd>Oil<cr>", desc = "Open parent directory" },
+    },
+  },
+  {
+    "nvim-neo-tree/neo-tree.nvim",
+    branch = "v3.x",
+    dependencies = {
+      "nvim-lua/plenary.nvim",
+      "MunifTanjim/nui.nvim",
+      "nvim-tree/nvim-web-devicons", -- optional, needs a Nerd Font
+    },
+    keys = {
+      { "<leader>e", "<cmd>Neotree toggle left<cr>", desc = "File tree" },
+      { "<leader>E", "<cmd>Neotree focus<cr>", desc = "Focus tree" },
+    },
+    opts = {
+      filesystem = {
+        follow_current_file = { enabled = true },
+        hijack_netrw_behavior = "disabled", -- let oil keep `nvim .`
+      },
+    },
+  },
+
   -- Git
   { "tpope/vim-fugitive", cmd = "Git" },
-  { "lewis6991/gitsigns.nvim", event = "BufReadPre", opts = {} },
+  { "lewis6991/gitsigns.nvim", event = "BufReadPre",
+    opts = {
+      on_attach = function(buf)
+        local gs = require("gitsigns")
+        local map = function(l, r, desc) vim.keymap.set("n", l, r, { buffer = buf, desc = desc }) end
+        map("]c", function() gs.nav_hunk("next") end, "Next hunk")
+        map("[c", function() gs.nav_hunk("prev") end, "Prev hunk")
+        map("<leader>hp", gs.preview_hunk, "Preview hunk")
+        map("<leader>hs", gs.stage_hunk, "Stage hunk")
+        map("<leader>hr", gs.reset_hunk, "Reset hunk")
+        map("<leader>hb", gs.blame_line, "Blame line")
+      end,
+    },
+  },
+  {
+    "sindrets/diffview.nvim",
+    cmd = { "DiffviewOpen", "DiffviewFileHistory" },
+    keys = {
+      { "<leader>gd", "<cmd>DiffviewOpen<cr>", desc = "Diff vs index" },
+      { "<leader>gh", "<cmd>DiffviewFileHistory %<cr>", desc = "File history" },
+    },
+  },
 
   -- Treesitter (main branch: no more nvim-treesitter.configs module;
   -- parsers are installed via require("nvim-treesitter").install and
@@ -71,8 +152,8 @@ require("lazy").setup({
     config = function()
       local ts = require("nvim-treesitter")
       local languages = {
-        "bash", "c", "go", "json", "lua", "markdown", "markdown_inline",
-        "python", "rust", "yaml",
+        "bash", "c", "cpp", "cuda", "go", "javascript", "json", "lua", "markdown", "markdown_inline",
+        "python", "rust", "starlark", "yaml",
       }
       if vim.fn.executable("tree-sitter") == 1 then
         ts.install(languages)
@@ -101,6 +182,44 @@ require("lazy").setup({
     },
   },
 
+  -- LSP (server configs come from lspconfig; enabling is built into nvim)
+  {
+    "neovim/nvim-lspconfig",
+    config = function()
+      vim.lsp.config("clangd", {
+        cmd = { "clangd", "--log=verbose", "--rename-file-limit=0", "--background-index" },
+        filetypes = { "c", "cpp", "cuda" },
+        capabilities = {
+          workspace = { didChangeWatchedFiles = { dynamicRegistration = true } },
+        },
+      })
+      vim.lsp.enable({ "clangd", "pylsp", "yamlls", "jsonls" })
+    end,
+  },
+
+  -- Formatting
+  {
+    "stevearc/conform.nvim",
+    opts = {
+      formatters_by_ft = {
+        c = fmt("clang-format"),
+        cpp = fmt("clang-format"),
+        cuda = fmt("clang-format"),
+        python = fmt("ruff_format"),
+        sh = fmt("shfmt"),
+        bash = fmt("shfmt"),
+        yaml = fmt("yamlfmt"),
+        json = fmt("biome"),
+        jsonc = fmt("biome"),
+        javascript = fmt("biome"),
+        typescript = fmt("biome"),
+        bzl = fmt("buildifier"),
+        ["_"] = { "trim_whitespace", "trim_newlines" }, -- everything else
+      },
+      format_on_save = { timeout_ms = 1000, lsp_format = "fallback" },
+    },
+  },
+
   -- Coverage
   {
     "andythigpen/nvim-coverage",
@@ -123,6 +242,11 @@ require("lazy").setup({
     },
   },
 
+  { "lewis6991/gitsigns.nvim", opts = {} },
+  { "kylechui/nvim-surround", opts = {} },
+  { "lukas-reineke/indent-blankline.nvim", main = "ibl", opts = {} },
+  { "HiPhish/rainbow-delimiters.nvim" },
+
   -- Theme
   {
     "folke/tokyonight.nvim",
@@ -138,6 +262,10 @@ require("lazy").setup({
 ------------------------------------------------------------------------
 local map = vim.keymap.set
 
+-- jk as Esc
+vim.keymap.set("i", "jk", "<Esc>")
+vim.opt.timeoutlen = 500
+
 -- Window navigation
 map("n", "<C-h>", "<C-w>h")
 map("n", "<C-j>", "<C-w>j")
@@ -146,3 +274,5 @@ map("n", "<C-l>", "<C-w>l")
 
 -- Clear search highlight
 map("n", "<Esc>", "<cmd>nohlsearch<CR>")
+
+map("n", "<leader>a", "<cmd>LspClangdSwitchSourceHeader<cr>", { desc = "Source/header" })

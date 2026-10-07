@@ -10,13 +10,14 @@
 	side-by-side = true
 [merge]
 	conflictStyle = zdiff3
+	tool = nvimdiff
 [rebase]
 	updateRefs = true
 	autoStash = true
 [fetch]
 	prune = true
 [diff]
-	tool = kdiff3
+	tool = nvimdiff
 [init]
 	defaultBranch = main
 [user]
@@ -33,3 +34,5 @@
 # later values win, so an include can only override what precedes it.
 [include]
 	path = ~/.gitconfig.local
+[mergetool]
+	keepBackup = false

@@ -1,6 +1,3 @@
-# Emacs mode
-bindkey -e
-
 # ALT-B - switch git branch via fzf
 fzf-git-checkout-widget() {
   git rev-parse --git-dir > /dev/null 2>&1 || return 5

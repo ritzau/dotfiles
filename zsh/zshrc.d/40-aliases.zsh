@@ -19,3 +19,7 @@ if [[ "$OSTYPE" == linux* ]]; then
   alias pbcopy='xsel -ib'
   alias pbpaste='xsel -ob'
 fi
+
+alias jb='just build'
+alias jt='just test'
+alias jc='just check'
