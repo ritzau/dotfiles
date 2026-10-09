@@ -47,7 +47,7 @@ The install script will:
 7. Symlink `tmux/tmux.conf` to `~/.tmux.conf`
 
 Existing files are backed up with a `.bak` suffix before being replaced.
-The optional `install-heavy.sh` installs tools from `mise/heavy.toml`, plus the Python LSP via uv. On Ubuntu, install `clangd` and `clang-format` through apt if missing. The Neovim configuration also needs a C compiler to build Treesitter parsers. A second run updates the tools; neither script invokes sudo.
+The optional `install-heavy.sh` combines the basic and heavy manifests into a generated user-local mise config so all tools are active in normal shells, and installs basedpyright via uv. Run `./check-nvim-tools.sh` to verify Neovim's external dependencies. Neovim uses blink.cmp, Ruff and basedpyright for Python, and language servers for Rust, Go and Lua. Treesitter parsers install on demand. On Ubuntu, install `clangd` and `clang-format` through apt if missing. The Neovim configuration also needs a C compiler to build Treesitter parsers. A second run updates the tools; neither script invokes sudo.
 
 ## Local overrides
 
