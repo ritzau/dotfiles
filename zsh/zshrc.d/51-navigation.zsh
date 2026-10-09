@@ -1,5 +1,5 @@
 # Interactive ancestor navigation and cached Bazel target selection.
-# Alt+U: choose a parent directory. Ctrl+B: insert a Bazel target.
+# Alt+U: choose a parent directory. Alt+B: insert a Bazel target.
 # Run bazel-targets-refresh to update the target cache explicitly.
 
 _dotfiles_workspace_root() {
@@ -84,4 +84,4 @@ _dotfiles_bazel_widget() {
   zle redisplay
 }
 zle -N _dotfiles_bazel_widget
-bindkey '^B' _dotfiles_bazel_widget
+bindkey '^[b' _dotfiles_bazel_widget
