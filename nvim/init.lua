@@ -89,6 +89,9 @@ require("lazy").setup({
     },
   },
 
+  -- Enhanced text objects
+  { "nvim-mini/mini.ai", version = "*", opts = {} },
+
   -- File browser
   {
     "stevearc/oil.nvim",
@@ -198,7 +201,7 @@ require("lazy").setup({
           workspace = { didChangeWatchedFiles = { dynamicRegistration = true } },
         },
       })
-      vim.lsp.enable({ "clangd", "pylsp", "yamlls", "jsonls" })
+      vim.lsp.enable({ "clangd", "basedpyright", "yamlls", "jsonls" })
     end,
   },
 
