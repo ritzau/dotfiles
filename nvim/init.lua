@@ -49,14 +49,6 @@ vim.opt.clipboard = "unnamedplus"
 
 vim.opt.completeopt = { "menu", "menuone", "noinsert", "fuzzy", "popup" }
 
-vim.api.nvim_create_autocmd("LspAttach", {
-  callback = function(ev)
-    vim.lsp.completion.enable(true, ev.data.client_id, ev.buf, { autotrigger = true })
-    -- manual trigger
-    vim.keymap.set("i", "<C-space>", vim.lsp.completion.get, { buffer = ev.buf })
-  end,
-})
-
 vim.diagnostic.config({
   virtual_text = true,            -- message at end of line
   -- or:
@@ -79,6 +71,7 @@ local init_path = vim.uv.fs_realpath(vim.fn.stdpath("config") .. "/init.lua")
 local lockfile = init_path and (vim.fs.dirname(init_path) .. "/lazy-lock.json") or nil
 
 require("lazy").setup({
+  { "saghen/blink.cmp", version = "1.*", opts = { keymap = { preset = "default" }, completion = { documentation = { auto_show = true } } } },
   -- Quick navigation (replaces easymotion)
   {
     "folke/flash.nvim",
@@ -156,24 +149,29 @@ require("lazy").setup({
     "nvim-treesitter/nvim-treesitter",
     branch = "main",
     lazy = false,
-    build = ":TSUpdate",
     config = function()
       local ts = require("nvim-treesitter")
-      local languages = {
-        "bash", "c", "cpp", "cuda", "go", "javascript", "json", "lua", "markdown", "markdown_inline",
-        "python", "rust", "starlark", "yaml",
-      }
-      if vim.fn.executable("tree-sitter") == 1 then
-        ts.install(languages)
-      else
-        vim.notify("nvim-treesitter: `tree-sitter` CLI not found; skipping parser install", vim.log.levels.WARN)
-      end
+      -- Parsers are installed on demand, never in a startup batch.
+      local installing = {}
       vim.api.nvim_create_autocmd("FileType", {
         callback = function(args)
-          if not pcall(vim.treesitter.start, args.buf) then
-            return
+          local lang = vim.treesitter.language.get_lang(vim.bo[args.buf].filetype)
+          if not lang then return end
+          local function start()
+            if not vim.api.nvim_buf_is_valid(args.buf) then return end
+            if pcall(vim.treesitter.start, args.buf) then
+              vim.bo[args.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+            end
           end
-          vim.bo[args.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+          if pcall(vim.treesitter.language.inspect, lang) then
+            start()
+          elseif vim.fn.executable("tree-sitter") == 1 and not installing[lang] then
+            installing[lang] = true
+            ts.install({ lang }):await(function()
+              installing[lang] = nil
+              start()
+            end)
+          end
         end,
       })
     end,
@@ -201,7 +199,7 @@ require("lazy").setup({
           workspace = { didChangeWatchedFiles = { dynamicRegistration = true } },
         },
       })
-      vim.lsp.enable({ "clangd", "basedpyright", "yamlls", "jsonls" })
+      vim.lsp.enable({ "clangd", "basedpyright", "ruff", "gopls", "rust_analyzer", "lua_ls", "yamlls", "jsonls" })
     end,
   },
 
