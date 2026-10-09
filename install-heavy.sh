@@ -10,7 +10,7 @@ fi
 # Install from a separate manifest without adding these tools to the
 # lightweight global mise configuration.
 MISE_YES=1 mise install --config "$DOTFILES_DIR/mise/heavy.toml"
-uv tool install python-lsp-server
+uv tool install basedpyright
 for tool in clangd clang-format; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "Missing $tool (install via system package manager, e.g. sudo apt install clangd clang-format)" >&2
