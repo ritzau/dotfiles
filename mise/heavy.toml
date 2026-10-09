@@ -1,0 +1,27 @@
+# Optional development tools installed by ./install-heavy.sh.
+# Includes Neovim and its external LSP, formatter, and parser dependencies.
+[tools]
+bottom = "latest"
+btop = "latest"
+buildifier = "latest"
+cloc = "latest"
+dust = "latest"
+eza = "latest"
+fastfetch = "latest"
+"ubi:tummychow/git-absorb" = "latest"
+go = "latest"
+just = "latest"
+neovim = "latest"
+tealdeer = "latest"
+tree-sitter = "latest"
+yq = "latest"
+
+# Neovim external dependencies (nvim/init.lua).
+clang = "latest"                 # clangd and clang-format
+node = "latest"                  # runtime for language servers
+"npm:yaml-language-server" = "latest"  # yamlls
+"npm:vscode-langservers-extracted" = "latest" # jsonls
+"npm:@biomejs/biome" = "latest"
+"npm:yamlfmt" = "latest"
+"npm:shfmt" = "latest"
+ruff = "latest"
