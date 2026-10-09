@@ -247,7 +247,6 @@ require("lazy").setup({
     },
   },
 
-  { "lewis6991/gitsigns.nvim", opts = {} },
   { "kylechui/nvim-surround", opts = {} },
   { "lukas-reineke/indent-blankline.nvim", main = "ibl", opts = {} },
   { "HiPhish/rainbow-delimiters.nvim" },
