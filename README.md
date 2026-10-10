@@ -8,7 +8,7 @@ as the user — no sudo), the shell is [zsh](https://www.zsh.org/).
 
 ```
 git/          Git configuration (delta, zdiff3, rebase workflow)
-mise/         Basic tools (config.toml) and optional development tools (heavy.toml)
+mise/         Basic tools (config.toml); legacy heavy manifest (heavy.toml)
 nvim/         Neovim configuration (lazy.nvim, treesitter, fzf-lua)
 p10k/         Powerlevel10k prompt configuration
 tmux/         tmux configuration (mouse, truecolor)
@@ -19,7 +19,8 @@ zsh/
   completion/ Completions for bazel, delta, fd, just, rg, uv
   disabled/   Opt-in plugin configs (ghcup, volta)
 install.sh    Basic installer
-install-heavy.sh  Optional developer/Neovim tools installer
+justfile      Independent language/toolchain and editor setup recipes
+install-heavy.sh  Deprecated; prints migration instructions
 Brewfile      macOS system tools (zsh, tmux, htop, …)
 ```
 
@@ -31,8 +32,12 @@ cd ~/dotfiles
 ./install.sh
 exec zsh -l
 
-# Optional: Neovim, language servers, formatters, and developer tools
-./install-heavy.sh
+# Optional: choose only what you need
+just --list
+just setup-editor
+just setup-go-toolchain  # optional, if Go is not already installed
+just setup-go            # gopls
+just setup-python        # Ruff and basedpyright; no Python installation
 ```
 
 The install script will:
@@ -47,7 +52,7 @@ The install script will:
 7. Symlink `tmux/tmux.conf` to `~/.tmux.conf`
 
 Existing files are backed up with a `.bak` suffix before being replaced.
-The optional `install-heavy.sh` combines the basic and heavy manifests into a generated user-local mise config so all tools are active in normal shells, and installs basedpyright via uv. Run `./check-nvim-tools.sh` to verify Neovim's external dependencies. Neovim uses blink.cmp, Ruff and basedpyright for Python, and language servers for Rust, Go and Lua. Treesitter parsers install on demand. On Ubuntu, install `clangd` and `clang-format` through apt if missing. The Neovim configuration also needs a C compiler to build Treesitter parsers. A second run updates the tools; neither script invokes sudo.
+Optional developer setup is controlled by the root Justfile. Run `just --list` to see recipes. Toolchain recipes (`setup-go-toolchain`, `setup-rust-toolchain`, `setup-python-toolchain`, `setup-cpp-toolchain`, `setup-web-toolchain`, `setup-lua-toolchain`) are separate from support-tool recipes (`setup-go`, `setup-rust`, `setup-python`, `setup-cpp`, `setup-web`, `setup-lua`, `setup-shell`, `setup-bazel`). `setup-editor` installs Neovim and tree-sitter; `setup-cli` installs optional general CLI tools. `setup-cpp` checks system-provided clang tooling rather than installing a compiler. `setup-go` uses `go install` for gopls instead of the unsupported `ubi:golang/tools` release. Some recipes require system-provided prerequisites. Run `just check` to inspect missing Neovim dependencies. `install-heavy.sh` is deprecated and no longer installs anything.
 
 ## Local overrides
 
