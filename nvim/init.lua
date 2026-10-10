@@ -199,7 +199,22 @@ require("lazy").setup({
           workspace = { didChangeWatchedFiles = { dynamicRegistration = true } },
         },
       })
-      vim.lsp.enable({ "clangd", "basedpyright", "ruff", "gopls", "rust_analyzer", "lua_ls", "yamlls", "jsonls" })
+      -- Enable only servers actually installed on this machine.
+      local servers = {
+        clangd = "clangd",
+        basedpyright = "basedpyright-langserver",
+        ruff = "ruff",
+        gopls = "gopls",
+        rust_analyzer = "rust-analyzer",
+        lua_ls = "lua-language-server",
+        yamlls = "yaml-language-server",
+        jsonls = "vscode-json-language-server",
+      }
+      for server, executable in pairs(servers) do
+        if vim.fn.executable(executable) == 1 then
+          vim.lsp.enable(server)
+        end
+      end
     end,
   },
 
