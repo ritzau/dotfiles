@@ -68,7 +68,9 @@ install_mise() {
 }
 
 install_tools() {
-  link "$DOTFILES_DIR/mise/config.toml" "$HOME/.config/mise/config.toml"
+  if [[ ! -e "$HOME/.config/mise/config.toml" ]]; then
+    link "$DOTFILES_DIR/mise/config.toml" "$HOME/.config/mise/config.toml"
+  fi
   info "Installing tools (mise/config.toml)..."
   MISE_YES=1 mise install
   # gpustat is a Python package; only where there is a GPU to look at.
@@ -92,8 +94,10 @@ install_p10k() {
 # without static builds.  Listed, never sudo'd.
 check_system_tools() {
   local missing=() tool
-  for tool in zsh tmux htop tig ncdu parallel; do
-    command -v "$tool" >/dev/null 2>&1 || missing+=("$tool")
+  for tool in zsh tmux; do
+    if ! command -v "$tool" >/dev/null 2>&1 || ! "$tool" --version >/dev/null 2>&1; then
+      missing+=("$tool")
+    fi
   done
   if (( ${#missing[@]} )); then
     warn "System tools missing: ${missing[*]}"

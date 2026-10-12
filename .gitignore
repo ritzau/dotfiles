@@ -1,0 +1,3 @@
+# Machine-local tool selections and state, if kept inside the checkout.
+packages.local.toml
+packages.receipt.json

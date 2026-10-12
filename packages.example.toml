@@ -1,0 +1,9 @@
+# Copy to ~/.config/dotfiles/packages.toml (machine-local, not tracked).
+# Optional profiles; core tools are always installed by ./install.sh.
+[profiles]
+enabled = ["cli", "editor", "rust", "python", "shell"]
+
+# Optional individual packages in addition to profiles.
+[packages]
+mise = [] # e.g. ["jq@latest"]
+uv = []   # e.g. ["black"]

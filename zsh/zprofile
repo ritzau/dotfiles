@@ -7,4 +7,9 @@ for f in "$ZDOTDIR_DOTFILES"/zprofile.d/<0-99>-*.zsh(N); do
   source "$f"
 done
 
+# Make mise tools available to programs launched from login sessions.
+if (( $+commands[mise] )); then
+  eval "$(mise activate zsh --shims)"
+fi
+
 export __DOTFILES_PROFILE_SOURCED=1

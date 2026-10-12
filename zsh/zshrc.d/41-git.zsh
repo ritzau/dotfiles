@@ -18,7 +18,31 @@ alias gpf='git push --force-with-lease'
 alias gpsup='git push --set-upstream origin $(git branch --show-current)'
 alias gcan!='git commit --all --amend --no-edit'
 alias grasq='git rebase --interactive --autosquash origin/main'
-alias gcof='git checkout "$(git branch --format="%(refname:short)" | fzf)"'
+# Fuzzy branch switcher: local and remote-tracking branches.
+gsw() {
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 1
+  local selected kind ref local_name
+  selected=$(
+    {
+      git for-each-ref --format='local %(refname:short)' refs/heads
+      git for-each-ref --format='remote %(refname:short)' refs/remotes
+    } | grep -vE '^remote [^ ]+/HEAD$' | fzf --prompt='Switch branch> ' --height=40% --reverse
+  ) || return 0
+  [[ -n $selected ]] || return 0
+  kind=${selected%% *}
+  ref=${selected#* }
+  if [[ $kind == local ]]; then
+    git switch -- "$ref"
+  else
+    local_name=${ref#*/}
+    if git show-ref --verify --quiet "refs/heads/$local_name"; then
+      git switch -- "$local_name"
+    else
+      git switch --track "$ref"
+    fi
+  fi
+}
+alias gcof='gsw'
 
 # Base branch for the stack/merged helpers below: $GIT_BASE_BRANCH if set,
 # else origin's default branch (as recorded at clone time), else main.

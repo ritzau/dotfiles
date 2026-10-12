@@ -49,18 +49,8 @@ vim.opt.clipboard = "unnamedplus"
 
 vim.opt.completeopt = { "menu", "menuone", "noinsert", "fuzzy", "popup" }
 
-vim.api.nvim_create_autocmd("LspAttach", {
-  callback = function(ev)
-    vim.lsp.completion.enable(true, ev.data.client_id, ev.buf, { autotrigger = true })
-    -- manual trigger
-    vim.keymap.set("i", "<C-space>", vim.lsp.completion.get, { buffer = ev.buf })
-  end,
-})
-
 vim.diagnostic.config({
   virtual_text = true,            -- message at end of line
-  -- or:
-  -- virtual_lines = { current_line = true },  -- full text under the current line
   severity_sort = true,
 })
 
@@ -79,15 +69,19 @@ local init_path = vim.uv.fs_realpath(vim.fn.stdpath("config") .. "/init.lua")
 local lockfile = init_path and (vim.fs.dirname(init_path) .. "/lazy-lock.json") or nil
 
 require("lazy").setup({
+  { "saghen/blink.cmp", version = "1.*", opts = { keymap = { preset = "default" }, completion = { documentation = { auto_show = true } } } },
   -- Quick navigation (replaces easymotion)
   {
     "folke/flash.nvim",
     event = "VeryLazy",
     keys = {
-      { "s", mode = { "n", "x", "o" }, function() require("flash").jump() end, desc = "Flash" },
+      { "s", mode = { "n", "x" }, function() require("flash").jump() end, desc = "Flash" },
       { "S", mode = { "n", "x", "o" }, function() require("flash").treesitter() end, desc = "Flash Treesitter" },
     },
   },
+
+  -- Enhanced text objects
+  { "nvim-mini/mini.ai", version = "*", opts = {} },
 
   -- File browser
   {
@@ -148,29 +142,34 @@ require("lazy").setup({
   -- Treesitter (main branch: no more nvim-treesitter.configs module;
   -- parsers are installed via require("nvim-treesitter").install and
   -- highlighting/indent are enabled per-buffer with core vim.treesitter).
-  -- Needs the `tree-sitter` CLI (in the flake) to compile parsers.
+  -- Parser compilation requires the optional tree-sitter CLI.
   {
     "nvim-treesitter/nvim-treesitter",
     branch = "main",
     lazy = false,
-    build = ":TSUpdate",
     config = function()
       local ts = require("nvim-treesitter")
-      local languages = {
-        "bash", "c", "cpp", "cuda", "go", "javascript", "json", "lua", "markdown", "markdown_inline",
-        "python", "rust", "starlark", "yaml",
-      }
-      if vim.fn.executable("tree-sitter") == 1 then
-        ts.install(languages)
-      else
-        vim.notify("nvim-treesitter: `tree-sitter` CLI not found; skipping parser install", vim.log.levels.WARN)
-      end
+      -- Parsers are installed on demand, never in a startup batch.
+      local installing = {}
       vim.api.nvim_create_autocmd("FileType", {
         callback = function(args)
-          if not pcall(vim.treesitter.start, args.buf) then
-            return
+          local lang = vim.treesitter.language.get_lang(vim.bo[args.buf].filetype)
+          if not lang then return end
+          local function start()
+            if not vim.api.nvim_buf_is_valid(args.buf) then return end
+            if pcall(vim.treesitter.start, args.buf) then
+              vim.bo[args.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+            end
           end
-          vim.bo[args.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+          if pcall(vim.treesitter.language.inspect, lang) then
+            start()
+          elseif vim.fn.executable("tree-sitter") == 1 and vim.fn.system({ "tree-sitter", "--version" }) ~= "" and vim.v.shell_error == 0 and not installing[lang] then
+            installing[lang] = true
+            ts.install({ lang }):await(function()
+              installing[lang] = nil
+              start()
+            end)
+          end
         end,
       })
     end,
@@ -191,14 +190,23 @@ require("lazy").setup({
   {
     "neovim/nvim-lspconfig",
     config = function()
-      vim.lsp.config("clangd", {
-        cmd = { "clangd", "--log=verbose", "--rename-file-limit=0", "--background-index" },
-        filetypes = { "c", "cpp", "cuda" },
-        capabilities = {
-          workspace = { didChangeWatchedFiles = { dynamicRegistration = true } },
-        },
-      })
-      vim.lsp.enable({ "clangd", "pylsp", "yamlls", "jsonls" })
+      -- Use clangd defaults; project flags belong in .clangd.
+      -- Enable only servers actually installed on this machine.
+      local servers = {
+        clangd = "clangd",
+        basedpyright = "basedpyright-langserver",
+        ruff = "ruff",
+        gopls = "gopls",
+        rust_analyzer = "rust-analyzer",
+        lua_ls = "lua-language-server",
+        yamlls = "yaml-language-server",
+        jsonls = "vscode-json-language-server",
+      }
+      for server, executable in pairs(servers) do
+        if vim.fn.executable(executable) == 1 then
+          vim.lsp.enable(server)
+        end
+      end
     end,
   },
 
@@ -240,14 +248,14 @@ require("lazy").setup({
       lang = {
         cpp = {
           coverage_file = function()
-            return vim.fs.root(0, ".git") .. "/.cache/coverage/lcov.info"
+            local root = vim.fs.root(0, ".git")
+            return root and (root .. "/.cache/coverage/lcov.info") or "lcov.info"
           end,
         },
       },
     },
   },
 
-  { "lewis6991/gitsigns.nvim", opts = {} },
   { "kylechui/nvim-surround", opts = {} },
   { "lukas-reineke/indent-blankline.nvim", main = "ibl", opts = {} },
   { "HiPhish/rainbow-delimiters.nvim" },
@@ -282,4 +290,16 @@ map("n", "<C-l>", "<C-w>l")
 -- Clear search highlight
 map("n", "<Esc>", "<cmd>nohlsearch<CR>")
 
-map("n", "<leader>a", "<cmd>LspClangdSwitchSourceHeader<cr>", { desc = "Source/header" })
+map("n", "<leader>a", function()
+  local clients = vim.lsp.get_clients({ bufnr = 0, name = "clangd" })
+  if #clients == 0 then
+    vim.notify("clangd is not attached", vim.log.levels.INFO)
+    return
+  end
+  clients[1]:request("textDocument/switchSourceHeader", { uri = vim.uri_from_bufnr(0) }, function(err, uri)
+    if err or not uri or uri == "" then return end
+    vim.schedule(function()
+      vim.cmd.edit(vim.fn.fnameescape(vim.uri_to_fname(uri)))
+    end)
+  end, 0)
+end, { desc = "Source/header" })
