@@ -1,5 +1,5 @@
 # Use eza if available, fall back to ls
-if (( $+commands[eza] )); then
+if (( $+commands[eza] )) && eza --version >/dev/null 2>&1; then
   alias ls='eza'
   alias ll='eza -lF'
   alias la='eza -a'
@@ -22,4 +22,4 @@ fi
 
 alias jb='just build'
 alias jt='just test'
-alias jc='just check'
+alias jc='just doctor'

@@ -1,0 +1,2 @@
+# Emacs mode
+bindkey -e
