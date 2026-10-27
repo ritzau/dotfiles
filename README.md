@@ -31,9 +31,7 @@ cd ~/dotfiles
 ./install.sh
 exec zsh -l
 
-# Optional: select profiles for this machine
-mkdir -p ~/.config/dotfiles
-cp packages.example.toml ~/.config/dotfiles/packages.toml
+# Optional: select more profiles for this machine
 ${EDITOR:-vi} ~/.config/dotfiles/packages.toml
 just status
 just install
@@ -43,13 +41,15 @@ just purge           # show removals and ask for confirmation
 The install script will:
 
 1. Install mise (one binary in `~/.local/bin`) and lightweight tools and Neovim in `mise/config.toml`
-2. Clone powerlevel10k, `uv tool install gpustat` where there is a GPU
-3. List missing system tools (zsh, tmux) — those
+2. Write `~/.config/dotfiles/packages.toml` with the `cli` and `editor`
+   profiles if it doesn't exist, and install the selected profiles
+3. Clone powerlevel10k, `uv tool install gpustat` where there is a GPU
+4. List missing system tools (zsh, tmux) — those
    are the machine's to install: `sudo apt install …`, or `brew bundle` on macOS
-4. Set up zsh config files (`~/.zshenv`, `~/.zprofile`, `~/.zshrc`)
-5. Symlink `git/config` to `~/.gitconfig`
-6. Symlink Neovim config to `~/.config/nvim/init.lua`
-7. Symlink `tmux/tmux.conf` to `~/.tmux.conf`
+5. Set up zsh config files (`~/.zshenv`, `~/.zprofile`, `~/.zshrc`)
+6. Symlink `git/config` to `~/.gitconfig`
+7. Symlink Neovim config to `~/.config/nvim/init.lua`
+8. Symlink `tmux/tmux.conf` to `~/.tmux.conf`
 
 Existing files are backed up with a `.bak` suffix before being replaced.
 Optional tools are selected in `~/.config/dotfiles/packages.toml`, which is

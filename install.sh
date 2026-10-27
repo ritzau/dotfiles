@@ -79,6 +79,26 @@ install_tools() {
   fi
 }
 
+# Optional profiles: a first install starts from the editor and CLI ones; an
+# existing manifest is the machine's choice and is left alone.
+install_packages() {
+  local manifest="$HOME/.config/dotfiles/packages.toml"
+  if [[ ! -e "$manifest" ]]; then
+    mkdir -p "$(dirname "$manifest")"
+    sed 's/^enabled = .*/enabled = ["cli", "editor"]/' \
+      "$DOTFILES_DIR/packages.example.toml" > "$manifest"
+    info "Wrote $manifest"
+  fi
+  info "Installing optional tools ($manifest)..."
+  # packages.py needs tomllib (Python 3.11+); uv brings one where the
+  # system's is older.
+  if python3 -c 'import tomllib' 2>/dev/null; then
+    python3 "$DOTFILES_DIR/packages.py" install
+  else
+    uv run -q --no-project --python '>=3.11' "$DOTFILES_DIR/packages.py" install
+  fi
+}
+
 # Pure zsh, so a clone is the install — the same on every machine.
 install_p10k() {
   local dir="$HOME/.local/share/powerlevel10k"
@@ -111,6 +131,7 @@ info "Installing dotfiles from $DOTFILES_DIR"
 # 1. Tools, as me
 install_mise
 install_tools
+install_packages
 install_p10k
 check_system_tools
 
