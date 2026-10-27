@@ -17,7 +17,8 @@ MISE_CONFIG = Path.home() / ".config/mise/config.toml"
 # Names are stable profile identifiers; only the selected profiles are installed.
 PROFILES = {
     "cli": ["bottom@latest", "btop@latest", "cloc@latest", "dust@latest",
-            "dua@latest", "eza@latest", "fastfetch@latest", "tealdeer@latest", "yq@latest"],
+            "dua@latest", "eza@latest", "fastfetch@latest", "conda:less@latest", "tealdeer@latest",
+            "yq@latest"],
     "editor": ["tree-sitter@latest"],
     "go": ["go@latest"],
     "rust": [],  # Rust remains owned by rustup, not this reconciler.
